@@ -5,4 +5,14 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="DotnetLightsaberFight-main\**" />
+    <EmbeddedResource Remove="DotnetLightsaberFight-main\**" />
+    <None Remove="DotnetLightsaberFight-main\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Unit-Testing\" />
+  </ItemGroup>
+
 </Project>
