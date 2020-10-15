@@ -11,8 +11,4 @@
     <None Remove="DotnetLightsaberFight-main\**" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Unit-Testing\" />
-  </ItemGroup>
-
 </Project>
