@@ -12,11 +12,15 @@ namespace TCG.Card
             Necromancer necro = new Necromancer();
             Orc orc = new Orc();
 
-            necro.attackCard();
-            orc.attackCard();
+            necro.GetHealth();
+            orc.GetHealth();
 
-            Console.WriteLine(necro.getHealth());
-            Console.WriteLine(orc.getHealth());
+            necro.AttackCard(orc);
+            orc.AttackCard(necro);
+
+            necro.GetHealth();
+            orc.GetHealth();
+
         }
     }
 }

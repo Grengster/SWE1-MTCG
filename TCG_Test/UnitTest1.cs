@@ -6,7 +6,7 @@ using TCG.Card.Subclasses;
 using TCG.Card;
 
 
-namespace NUnitTestProject1
+namespace TCG_Test
 {
     public class Tests
     {
@@ -19,10 +19,7 @@ namespace NUnitTestProject1
         public void Test1()
         {
             Orc orc_ = new Orc();
-
             Assert.NotNull(orc_);
-
-            //calc.multVal()
         }
     }
 }

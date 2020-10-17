@@ -9,14 +9,18 @@ namespace TCG.Card.Subclasses
     {
         public Necromancer() : base()
         {
+            cardType = CardTypes.Monster;
+            cardElement = CardElements.Darkness;
             health = 50;
             damage = 100;
             soulpower = 100;
         }
-        public new void attackCard()
+        /*
+        public void AttackCard()
         {
             Console.WriteLine("The Necromancer attacks!");
         }
+        */
 
     }
 }
