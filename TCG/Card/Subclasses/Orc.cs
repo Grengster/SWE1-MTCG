@@ -10,11 +10,11 @@ namespace TCG.Card.Subclasses
     {
         public Orc() : base()
         {
-            cardType = CardTypes.Monster;
-            cardElement = CardElements.Normal;
-            health = 120;
-            damage = 80;
-
+            CardType = (CardTypes)2;
+            CardElement = (CardElements)rnd.Next(1,7);
+            Health = 120;
+            Damage = 80;
+            Name = "Orc";
         }
         /*
         public new void AttackCard()
