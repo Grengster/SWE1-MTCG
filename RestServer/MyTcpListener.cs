@@ -44,7 +44,7 @@ class MyTcpListener
             while (true)
             {
                 // Loop to receive all the data sent by the client.
-                handler.GetPostFunct(server, ref messageList, ref msgNum);
+                handler.GetPostFunct(ref server, ref messageList, ref msgNum);
             }
         }
         catch (SocketException e)
