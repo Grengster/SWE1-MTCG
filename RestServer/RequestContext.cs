@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel.DataAnnotations;
 
 namespace Request
 {
@@ -13,7 +14,45 @@ namespace Request
 
         public RequestContext() { }
 
-        public void checkMessage(ref string data, string RqstType, ref List<string> messageList, ref int msgNum)
+        public void sendStatus(ref NetworkStream stream, string message, int statuscode)
+        {
+            
+            string statusString = statuscode.ToString();
+            string serverResponse ="", serverResponse1 = "", serverResponse2 = "", statusMsg = "";
+                if (statuscode == 200)
+                    statusMsg = " OK";
+                else if (statuscode == 403)
+                    statusMsg = " FORBIDDEN";
+                else if (statuscode == 404)
+                    statusMsg = " NOT FOUND";
+                if (statuscode >= 100)
+                {
+                    serverResponse1 = "HTTP/1.1 " + statusString;
+                    serverResponse2 = "\nServer: myserver \nContent - Length:" + message.Length + " \nContent - Language: de \nConnection: close \nContent - Type: text / plain\n\n" + message;
+                    serverResponse = serverResponse1 + statusMsg + serverResponse2;
+                }
+
+            byte[] sendBytes = Encoding.ASCII.GetBytes(serverResponse);
+            stream.Write(sendBytes, 0, sendBytes.Length);
+            stream.Flush();
+        }
+
+        public bool checkError(ref NetworkStream stream, string RqstType)
+        {
+            switch(RqstType)
+            {
+                case "PUT":
+                    return true;
+                case "DELETE":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+
+
+        public void checkMessage(ref NetworkStream stream, ref string data, string RqstType, ref List<string> messageList, ref int msgNum)
         {
             char space = (char)32;
             if (data.Contains(RqstType))
@@ -22,66 +61,92 @@ namespace Request
                 {
                     if (data.Contains("/messages"))
                     {
-                        if(RqstType == "GET")
+                        if (!checkError(ref stream, RqstType))
                         {
-                            bool noMsg = true;
-                            foreach (object o in messageList)
+                            if (RqstType == "GET")
                             {
-                                Console.WriteLine(o);
-                                noMsg = false;
-                            }
-                            if (noMsg)
-                            {
-                                Console.WriteLine("No messages available!");
-                            }
-                        }
-                        else
-                        { 
-                            string userMsg = data.Substring(113);
-                            if (userMsg.Contains(space))
-                            {
-                                userMsg = data.Substring(0);
-                                messageList.Add(userMsg);
-                                Console.WriteLine("Added message at number {0}", msgNum);
-                                msgNum++;
+                                string fullMsg = "";
+                                bool noMsg = true;
+                                foreach (object o in messageList)
+                                {
+                                    Console.WriteLine(o);
+                                    fullMsg = fullMsg + o.ToString() + "\n";
+                                    noMsg = false;
+                                }
+                                if (noMsg)
+                                {
+                                    sendStatus(ref stream, "ERROR", 404);
+                                }
+                                else
+                                    sendStatus(ref stream, fullMsg, 200);
                             }
                             else
                             {
-                                messageList.Add(userMsg);
-                                Console.WriteLine("Added message at number {0}", msgNum);
-                                msgNum++;
+                                string userMsg = data.Substring(113);
+                                if (userMsg.Contains(space))
+                                {
+                                    userMsg = userMsg.Substring(0);
+                                    if (userMsg.Length > 10)
+                                        userMsg = userMsg.Substring(1); 
+                                    }
+                                    messageList.Add(userMsg);
+                                    Console.WriteLine("Added message at number {0}", msgNum);
+                                    sendStatus(ref stream, userMsg, 200);
+                                    msgNum++;
                             }
                         }
-
+                        else
+                            sendStatus(ref stream, "FORBIDDEN", 403);
                     }
                 }
                 else
-                if(RqstType == "GET")
+                if(RqstType == "GET" || RqstType == "PUT" || RqstType == "DELETE")
                 {
                     var stringNum = data.Substring(data.LastIndexOf("es/") + 3, space);
                     string modifiedString = stringNum.Split(" ")[0];
                     int result = Int32.Parse(modifiedString);
                     bool noMsg = true;
                     int counter = 0;
+                    string fullMsg = "";
                     foreach (object o in messageList)
                     {
                         if (result - 1 == counter)
                         {
-                            Console.WriteLine(o);
+                            fullMsg = fullMsg + o.ToString();
+                            if (RqstType == "GET")
+                            { 
+                                Console.WriteLine(o);
+                                sendStatus(ref stream, fullMsg, 200);
+                            }
+                            else if (RqstType == "PUT")
+                            {
+                                string userMsg = data.Substring(114);
+                                if(userMsg.Length >= 10)
+                                    userMsg = userMsg.Substring(0);
+                                messageList[counter] = messageList[counter].Replace(fullMsg, userMsg);
+                                sendStatus(ref stream, userMsg, 200);
+                            }
+                            else if (RqstType == "DELETE")
+                            {
+                                messageList.RemoveAt(counter);
+                                sendStatus(ref stream, "Removed: " + fullMsg, 200);
+                            }
                             noMsg = false;
                             break;
                         }
                         counter++;
                     }
                     if (noMsg)
-                    {
-                        Console.WriteLine("No messages found at this spot.");
-                    }
+                        sendStatus(ref stream, "NOT FOUND", 404);                        
+                }
+                else
+                {
+                    sendStatus(ref stream, "FORBIDDEN", 403);
                 }
             }
             else
             {
-                Console.WriteLine("Error encountered, wrong usage.");
+                sendStatus(ref stream, "FORBIDDEN", 403);
             }
         }
 
@@ -107,20 +172,25 @@ namespace Request
             {
                 // Translate data bytes to a ASCII string.
                 userData = System.Text.Encoding.ASCII.GetString(bytes, 0, i);
-                //Console.WriteLine("Received: {0} ", userData);
                 if (userData.Contains("GET"))
-                    checkMessage(ref userData, "GET", ref messageList, ref msgNum);
+                    checkMessage(ref stream, ref userData, "GET", ref messageList, ref msgNum);
                 else 
                 if (userData.Contains("POST"))
-                    checkMessage(ref userData, "POST", ref messageList, ref msgNum);
+                    checkMessage(ref stream, ref userData, "POST", ref messageList, ref msgNum);
+                else
+                if (userData.Contains("PUT"))
+                    checkMessage(ref stream, ref userData, "PUT", ref messageList, ref msgNum);
+                else
+                if (userData.Contains("DELETE"))
+                    checkMessage(ref stream, ref userData, "DELETE", ref messageList, ref msgNum);
                 break;
             }
-            string response = "Hallo";
-            string serverResponse = "HTTP/1.1 200 OK \nServer: myserver \nContent - Length:" + response.Length + " \nContent - Language: de \nConnection: close \nContent - Type: text / plain\n\n" + response;
+            //string response = "Hallo";
+            //string serverResponse = "HTTP/1.1 200 OK \nServer: myserver \nContent - Length:" + response.Length + " \nContent - Language: de \nConnection: close \nContent - Type: text / plain\n\n" + response;
             //Console.WriteLine(serverResponse);
-            byte[] sendBytes = Encoding.ASCII.GetBytes(serverResponse);
-            stream.Write(sendBytes, 0, sendBytes.Length);
-            stream.Flush();
+            //byte[] sendBytes = Encoding.ASCII.GetBytes(serverResponse);
+            //stream.Write(sendBytes, 0, sendBytes.Length);
+            //stream.Flush();
             client.Close();
         }
 
