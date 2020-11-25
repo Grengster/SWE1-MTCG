@@ -6,7 +6,7 @@ using System.Text;
 using System.Collections.Generic;
 using System.Linq;
 using Request;
-
+using DatabaseHandler;
 
 
 namespace MockServer
@@ -25,7 +25,9 @@ namespace MockServer
         }
         public static void Main()
         {
-
+            DatabaseHandlerClass databaseServer = new DatabaseHandlerClass();
+            string sqlstring = "SELECT * FROM User;";
+            databaseServer.runQuery(sqlstring);
             TcpListener server = null;
             try
             {
