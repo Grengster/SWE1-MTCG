@@ -7,12 +7,11 @@
 
   <ItemGroup>
     <Compile Remove="DotnetLightsaberFight-main\**" />
+    <Compile Remove="Unit-Testing\**" />
     <EmbeddedResource Remove="DotnetLightsaberFight-main\**" />
+    <EmbeddedResource Remove="Unit-Testing\**" />
     <None Remove="DotnetLightsaberFight-main\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Unit-Testing\" />
+    <None Remove="Unit-Testing\**" />
   </ItemGroup>
 
 </Project>
