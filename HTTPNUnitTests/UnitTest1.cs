@@ -1,4 +1,6 @@
 using NUnit.Framework;
+using MockServer;
+using Request;
 
 namespace HTTPNUnitTests
 {
@@ -12,7 +14,9 @@ namespace HTTPNUnitTests
         [Test]
         public void Test1()
         {
-            Assert.Pass();
+            MyTcpListener server = new MyTcpListener();
+            RequestContext test = new RequestContext();
+            Assert.IsNotNull(server);
         }
     }
 }

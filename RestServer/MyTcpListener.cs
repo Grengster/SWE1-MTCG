@@ -41,14 +41,13 @@ namespace MockServer
 
                 RequestContext handler = new RequestContext();
                 List<string> messageList = new List<string>();
-                int msgNum = 1;
                 // Buffer for reading data
 
                 // Enter the listening loop.
                 while (true)
                 {
                     // Loop to receive all the data sent by the client.
-                    handler.GetPostFunct(ref server, ref messageList, ref msgNum);
+                    handler.GetPostFunct(ref server, ref messageList);
                 }
             }
             catch (SocketException e)
