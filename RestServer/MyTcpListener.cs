@@ -5,9 +5,10 @@ using System.Net.Sockets;
 using System.Text;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Request;
 using DatabaseHandler;
-
+using RestServer;
 
 namespace MockServer
 {
@@ -23,11 +24,10 @@ namespace MockServer
 
             return index;
         }
-        public static void Main()
+        public static void Main(string[] args)
         {
             DatabaseHandlerClass databaseServer = new DatabaseHandlerClass();
-            string sqlstring = "SELECT * FROM User;";
-            databaseServer.runQuery(sqlstring);
+            databaseServer.DBConnect();
             TcpListener server = null;
             try
             {
@@ -41,15 +41,17 @@ namespace MockServer
                 // Start listening for client requests.
                 server.Start();
 
-                RequestContext handler = new RequestContext();
-                List<string> messageList = new List<string>();
                 // Buffer for reading data
 
                 // Enter the listening loop.
                 while (true)
                 {
-                    // Loop to receive all the data sent by the client.
-                    handler.GetPostFunct(ref server, ref messageList);
+                    Console.WriteLine("Waiting for a connection...");
+                    TcpClient client = server.AcceptTcpClient();
+                    Console.WriteLine("Connected!");
+                    Thread t = new Thread(UserAction);
+                    t.Start(client);
+                    
                 }
             }
             catch (SocketException e)
@@ -65,5 +67,36 @@ namespace MockServer
             Console.WriteLine("\nHit enter to continue...");
             Console.Read();
         }
+
+        public static void UserAction(Object obj)
+        {
+            TcpClient client = (TcpClient)obj;
+            NetworkStream stream = client.GetStream();
+            RequestContext handler = new RequestContext();
+            List<string> messageList = new List<string>();
+            string data = null;
+            Byte[] bytes = new Byte[200000];
+            int i;
+                try
+                {
+                    while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
+                    {
+                        data = Encoding.ASCII.GetString(bytes, 0, i);
+                        handler.GetPostFunct(data, messageList, stream, client);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Exception: {0}", e.ToString());
+                    stream.Close();
+                    client.Close();
+                }
+
+            data = null;
+            stream.Close();
+            client.Close();
+        }
+
+
     }
 }

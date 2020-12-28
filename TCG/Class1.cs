@@ -6,7 +6,7 @@ namespace TCG
 {
     public class Class1
     {
-        public int multVal(int varx, int vary)
+        public int MultVal(int varx, int vary)
         {
             return varx * vary;
         }
