@@ -4,6 +4,16 @@ using System.Text;
 using System.Security.Cryptography;
 using Npgsql;
 using RestServer;
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Linq;
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Newtonsoft.Json;
+using DatabaseHandler;
+using System.Xml.XPath;
 
 namespace DatabaseHandler
 {
@@ -67,7 +77,7 @@ namespace DatabaseHandler
 
 
 
-        public SessUser LoginUser(string username, string pass)
+        public int LoginUser(string username, string pass, ref SessUser user)
         {
 
             // Retrieve all rows
@@ -86,14 +96,14 @@ namespace DatabaseHandler
             if (!isFound)
             {
                 Console.WriteLine("\nWrong password or username!");
-                return null;
+                return -1;
             }
             else
             {
                 DateTime time = DateTime.Now;              // Use current time
                 string format = "yyyy-MM-dd HH:mm:ss";    // modify the format depending upon input required in the column in 
                 Console.WriteLine("\nSuccessfully logged in!");
-                SessUser user = new SessUser(username, pass);
+                user.setUser(username, pass);
                 using (var cmd2 = new NpgsqlCommand($"SELECT lastlogin FROM \"user\" WHERE username = @u", conn))
                 {
                     cmd2.Parameters.AddWithValue("u", username);
@@ -111,9 +121,62 @@ namespace DatabaseHandler
                     cmd3.Parameters.AddWithValue("t", time.ToString(format));
                     cmd3.ExecuteNonQuery();
                 }
-                return user;
+                return 1;
             }
         }
+
+
+        public deckData GetDecks(int decknumber)
+        {
+            string deckJson = "";
+            // Retrieve all rows
+            using var cmd = new NpgsqlCommand("SELECT * FROM \"decks\" WHERE 'deckId' = @n", conn);
+            cmd.Parameters.AddWithValue("n", decknumber.ToString());
+            cmd.ExecuteNonQuery();
+            bool isFound = false;
+            using (var reader = cmd.ExecuteReader())
+                while (reader.Read())
+                {
+                    //Console.WriteLine(reader.GetInt32(0)); GET THE ID OR FOR STRING ToString(0);
+                    deckJson = reader.GetString(0);
+                    Console.WriteLine(deckJson);
+                    isFound = true;
+                    break;
+                }
+            if (!isFound)
+            {
+                Console.WriteLine("\nNo deck was found with that number!");
+                return null;
+            }
+            else
+            {
+
+                deckData deck = JsonConvert.DeserializeObject<deckData>(deckJson);
+                Console.WriteLine(deck.GetDeckInfo());
+                return deck;
+            }
+        }
+
+
+
+        public bool SetDecks(List<deckData> results)
+        {
+            // Retrieve all rows
+            using var cmd = new NpgsqlCommand("INSERT INTO public.decks(cards) VALUES ('{ \"Id\": \"@i\", \"Name\":\"@n\", \"Damage\": @d}'); ", conn);
+            cmd.ExecuteNonQuery();
+            cmd.Parameters.AddWithValue("i", );
+            cmd.Parameters.AddWithValue("n", MD5Hash(pass));
+            cmd.Parameters.AddWithValue("d", time.ToString(format));
+            if (cmd.ExecuteNonQuery() == 1)
+                return true;
+            else
+                return false;
+        }
+
+
+
+
+
 
         public static void CreateUser(string name, string pwd)
         {

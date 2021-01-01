@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 using DatabaseHandler;
 using System.Xml.XPath;
+using RestServer;
 
 namespace Request
 {
@@ -30,6 +31,8 @@ namespace Request
                 statusMsg = " FORBIDDEN";
             else if (statuscode == 404)
                 statusMsg = " NOT FOUND";
+            else if (statuscode == 499)
+                statusMsg = " CLIENT CLOSED REQUEST";
             if (statuscode >= 100)
             {
                 serverResponse1 =   "HTTP/1.1 " + statusString;
@@ -57,63 +60,17 @@ namespace Request
             };
         }
 
-        public void CheckMessage(  NetworkStream stream,   string data, string RqstType,   List<string> messageList)
+        public void CheckMessage(NetworkStream stream, string data, string RqstType, List<string> messageList, ref SessUser user)
         {
-            char space = (char)32;
+            Console.WriteLine(data);
             if (data.Contains(RqstType))
             {
-                
-                    if (!CheckError(RqstType))
-                    {
-                        if (RqstType == "POST")
-                        {
-                            if (data.Contains("/users HTTP/1.1") || data.Contains("/sessions HTTP/1.1"))
-                            {
-                                if (data.Contains("Content-Type: application/json"))
-                                {
-                                    int pFrom = data.IndexOf("{") + "{".Length;
-                                    int pTo = data.LastIndexOf("}");
-
-                                    String result = data[pFrom..pTo];
-                                    result = "{" + result + "}";
-
-
-                                    Userdata user = JsonConvert.DeserializeObject<Userdata>(result);
-                                    if(data.Contains("/users HTTP/1.1"))
-                                    {
-                                        if (database.RegisterUser(user.Username, user.Password)) //go into database and use name & pwd from json decoded class
-                                            SendStatus(stream, user.Username + " " + user.Password, 200);
-                                        else
-                                            SendStatus(stream, "USERNAME TAKEN", 403);
-                                    }
-                                    if (data.Contains("/sessions HTTP/1.1"))
-                                    {
-                                        if (database.LoginUser(user.Username, user.Password) != null) //go into database and use name & pwd from json decoded class
-                                            SendStatus(stream, "Logged in as: " + user.Username, 200);
-                                        else
-                                            SendStatus(stream, "WRONG PASSWORD/USERNAME", 403);
-                                    }
-                            }
-                            else
-                                SendStatus(stream, "ERROR", 404);
-                            }
-                        }
-                        else
-                        {
-                            string userMsg = data.Substring(113);
-                            if (userMsg.Contains(space))
-                            {
-                                userMsg = userMsg.Substring(0);
-                                if (userMsg.Length > 10)
-                                    userMsg = userMsg.Substring(1);
-                            }
-                            messageList.Add(userMsg);
-                            Console.WriteLine("Added message at number {0}", messageList.Count());
-                            SendStatus(stream, userMsg, 200);
-                        }
-                    }
-                    else
-                        SendStatus(stream, "FORBIDDEN", 403);
+                if (!CheckError(RqstType))
+                {
+                    StreamPost(stream, data, RqstType, ref user);
+                }
+                else
+                    SendStatus(stream, "FORBIDDEN", 403);
             }
             else
             {
@@ -122,22 +79,83 @@ namespace Request
         }
 
 
-        public void GetPostFunct( string data, List<string> messageList, NetworkStream stream, TcpClient client)
-        {
 
-                if (data.Contains("GET"))
-                    CheckMessage(stream, data, "GET",messageList);
-                else
-                if (data.Contains("POST"))
-                    CheckMessage(stream, data, "POST",  messageList);
-                else
-                if (data.Contains("PUT"))
-                    CheckMessage(stream, data, "PUT",   messageList);
-                else
-                if (data.Contains("DELETE"))
-                    CheckMessage(stream, data, "DELETE",messageList);
-                if (data.Contains("QUIT"))
-                    client.Close();
+        public void StreamPost(NetworkStream stream, string data, string RqstType, ref SessUser user)
+        {
+            if (RqstType == "POST")
+            {
+                if (data.Contains("/users HTTP/1.1") || data.Contains("/sessions HTTP/1.1"))
+                {
+                    if (data.Contains("Content-Type: application/json"))
+                    {
+                        int pFrom = data.IndexOf("{") + "{".Length;
+                        int pTo = data.LastIndexOf("}");
+
+                        String result = data[pFrom..pTo];
+                        result = "{" + result + "}";
+                        Userdata userJson = JsonConvert.DeserializeObject<Userdata>(result);
+                        //user.setUser(userJson.Username, userJson.Password);
+                        if (data.Contains("/users HTTP/1.1"))
+                        {
+                            if (database.RegisterUser(userJson.Username, userJson.Password)) //go into database and use name & pwd from json decoded class
+                                SendStatus(stream, userJson.Username + " " + userJson.Password, 200);
+                            else
+                                SendStatus(stream, "USERNAME TAKEN", 403);
+                        }
+                        if (data.Contains("/sessions HTTP/1.1"))
+                        {
+                            if (database.LoginUser(userJson.Username, userJson.Password, ref user) == 1) //go into database and use name & pwd from json decoded class
+                            {
+                                SendStatus(stream, "Logged in as: " + user.GetUser(), 200);
+                            } 
+                            else
+                                SendStatus(stream, "WRONG PASSWORD/USERNAME", 403);
+                        }
+                        
+                    }
+                    //else if()
+
+                    else 
+                        SendStatus(stream, "ERROR", 404);
+                }
+                if (data.Contains("transactions/packages HTTP/1.1"))
+                {
+                    if (data.Contains("Content-Type: application/json"))
+                    {
+                        deckData deck;
+                        if (database.GetDecks(5) != null)
+                        {
+                            deck = database.GetDecks(2);
+                            SendStatus(stream, deck.GetDeckInfo(), 200);
+                        }
+                        else
+                            SendStatus(stream, "WRONG DECKCODE", 403);
+                    }
+                }
+            }
+        }
+
+        public void GetPostFunct( string data, List<string> messageList, NetworkStream stream, TcpClient client, ref SessUser user, ref bool userConnected)
+        {
+            if (data.Contains("QUIT"))
+            {
+                SendStatus(stream, "Successfully logged out", 499);
+                userConnected = false;
+                return;
+            }
+            if (data.Contains("GET"))
+                CheckMessage(stream, data, "GET",messageList, ref user);
+            else
+            if (data.Contains("POST"))
+                CheckMessage(stream, data, "POST",  messageList, ref user);
+            else
+            if (data.Contains("PUT"))
+                CheckMessage(stream, data, "PUT",   messageList, ref user);
+            else
+            if (data.Contains("DELETE"))
+                CheckMessage(stream, data, "DELETE",messageList, ref user);
+            
+                    
             //string response = "Hallo";
             //string serverResponse = "HTTP/1.1 200 OK \nServer: myserver \nContent - Length:" + response.Length + " \nContent - Language: de \nConnection: close \nContent - Type: text / plain\n\n" + response;
             //Console.WriteLine(serverResponse);

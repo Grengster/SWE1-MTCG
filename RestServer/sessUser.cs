@@ -8,15 +8,26 @@ namespace RestServer
     {
         private string username="", password="";
         private DateTime lastlogin;
-        public SessUser(string name, string pwd)
+        public SessUser()
+        {
+            
+        }
+
+        public void setUser(string name, string pwd)
         {
             username = name;
             password = pwd;
         }
 
-        public void GetUser()
+        public string GetInfo()
         {
-            Console.WriteLine("Here is your fucking name: " + username + "\nLast login: " + GetLastLogin());
+            return "Here is your name: " + username + "\nLast login: " + GetLastLogin();
+        }
+
+
+        public string GetUser()
+        {
+            return username;
         }
         public void SetLastLogin(DateTime time)
         {

@@ -75,14 +75,20 @@ namespace MockServer
             RequestContext handler = new RequestContext();
             List<string> messageList = new List<string>();
             string data = null;
-            Byte[] bytes = new Byte[200000];
+            Byte[] bytes = new Byte[2048];
             int i;
+            SessUser user = new SessUser();
+            bool userConnected = true;
+            while(userConnected)
+            {
                 try
                 {
                     while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
                     {
                         data = Encoding.ASCII.GetString(bytes, 0, i);
-                        handler.GetPostFunct(data, messageList, stream, client);
+                        handler.GetPostFunct(data, messageList, stream, client, ref user, ref userConnected);
+                        if (!userConnected)
+                            break;
                     }
                 }
                 catch (Exception e)
@@ -91,7 +97,7 @@ namespace MockServer
                     stream.Close();
                     client.Close();
                 }
-
+            }
             data = null;
             stream.Close();
             client.Close();
