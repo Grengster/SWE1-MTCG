@@ -14,6 +14,7 @@ using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 using DatabaseHandler;
 using System.Xml.XPath;
+using NpgsqlTypes;
 
 namespace DatabaseHandler
 {
@@ -77,7 +78,7 @@ namespace DatabaseHandler
 
 
 
-        public int LoginUser(string username, string pass, ref SessUser user)
+        public int LoginUser(string username, string pass, SessUser user)
         {
 
             // Retrieve all rows
@@ -159,18 +160,30 @@ namespace DatabaseHandler
 
 
 
-        public bool SetDecks(List<deckData> results)
+        public bool SetDecks(List<deckData> results, SessUser user)
         {
-            // Retrieve all rows
-            using var cmd = new NpgsqlCommand("INSERT INTO public.decks(cards) VALUES ('{ \"Id\": \"@i\", \"Name\":\"@n\", \"Damage\": @d}'); ", conn);
-            cmd.ExecuteNonQuery();
-            cmd.Parameters.AddWithValue("i", );
-            cmd.Parameters.AddWithValue("n", MD5Hash(pass));
-            cmd.Parameters.AddWithValue("d", time.ToString(format));
-            if (cmd.ExecuteNonQuery() == 1)
+            Console.WriteLine(user.GetUser()); //still doesnt work, dont know why, dont care why
+            if(user.username != "admin")
+                return false;
+            bool working = true;
+            foreach (var deckData in results)
+            {
+                using (var cmd = new NpgsqlCommand($"INSERT INTO decks (cards) VALUES (@i)", conn))
+                {
+                    
+                    cmd.Parameters.Add(new NpgsqlParameter("i", NpgsqlDbType.Jsonb) { Value = deckData.GetDeckInfo()}); //we need to map the parameters to json
+                    if (cmd.ExecuteNonQuery() == 0)
+                        working = false;
+                    Console.WriteLine(deckData.GetDeckInfo());
+                }
+                
+            }
+            if (working)
                 return true;
             else
                 return false;
+            // Retrieve all rows
+            
         }
 
 

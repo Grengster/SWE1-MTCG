@@ -3,15 +3,15 @@ using System.Collections.Generic;
 
 public class RootObject
 {
-    public int resultCount { get; set; }
-    public List <deckData> results { get; set; }
+    public int cardCount { get; set; }
+    public List <deckData> card { get; set; }
 }
 
 public class deckData
 {
     public string Id { get; set; }
     public string Name { get; set; }
-    public int Damage { get; set; }
+    public float Damage { get; set; }
 
     public string GetId()
     {
@@ -28,6 +28,6 @@ public class deckData
 
     public string GetDeckInfo()
     {
-        return "Id: " + Id + " Name: " + Name + " Damage: " + Damage;
+        return "{\"Id\":\"" + Id + "\", \"Name\":\"" + Name + "\", \"Damage\":" + Damage  + "}";
     }
 }

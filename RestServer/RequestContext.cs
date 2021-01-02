@@ -13,6 +13,7 @@ using DatabaseHandler;
 using System.Xml.XPath;
 using RestServer;
 
+
 namespace Request
 {
     public class RequestContext
@@ -60,14 +61,14 @@ namespace Request
             };
         }
 
-        public void CheckMessage(NetworkStream stream, string data, string RqstType, List<string> messageList, ref SessUser user)
+        public void CheckMessage(NetworkStream stream, string data, string RqstType, List<string> messageList, SessUser user)
         {
             Console.WriteLine(data);
             if (data.Contains(RqstType))
             {
                 if (!CheckError(RqstType))
                 {
-                    StreamPost(stream, data, RqstType, ref user);
+                    StreamPost(stream, data, RqstType, user);
                 }
                 else
                     SendStatus(stream, "FORBIDDEN", 403);
@@ -80,7 +81,7 @@ namespace Request
 
 
 
-        public void StreamPost(NetworkStream stream, string data, string RqstType, ref SessUser user)
+        public void StreamPost(NetworkStream stream, string data, string RqstType, SessUser user)
         {
             if (RqstType == "POST")
             {
@@ -104,7 +105,7 @@ namespace Request
                         }
                         if (data.Contains("/sessions HTTP/1.1"))
                         {
-                            if (database.LoginUser(userJson.Username, userJson.Password, ref user) == 1) //go into database and use name & pwd from json decoded class
+                            if (database.LoginUser(userJson.Username, userJson.Password, user) == 1) //go into database and use name & pwd from json decoded class
                             {
                                 SendStatus(stream, "Logged in as: " + user.GetUser(), 200);
                             } 
@@ -132,11 +133,33 @@ namespace Request
                             SendStatus(stream, "WRONG DECKCODE", 403);
                     }
                 }
+                else if (data.Contains("/packages HTTP/1.1"))
+                {
+                    int pFrom = data.IndexOf("{") + "{".Length;
+                    int pTo = data.LastIndexOf("}");
+
+                    String result = data[pFrom..pTo];
+                    result = "{ \"card\": [{" + result + "}]}";
+                    RootObject test = JsonConvert.DeserializeObject<RootObject>(result);
+                    Console.WriteLine(test.card[0]);
+                    if(database.SetDecks(test.card, user))
+                        SendStatus(stream, "INSERT SUCCESS", 200);
+                    else
+                        SendStatus(stream, "ERROR EXECUTING COMMAND", 403);
+                }
+                else
+                    SendStatus(stream, "WRONG COMMAND", 403);
             }
         }
 
-        public void GetPostFunct( string data, List<string> messageList, NetworkStream stream, TcpClient client, ref SessUser user, ref bool userConnected)
+        public void GetPostFunct( string data, List<string> messageList, NetworkStream stream, TcpClient client, SessUser user, ref bool userConnected)
         {
+            if(user == null)
+            {
+                SendStatus(stream, "Please login before trying to access any other functions.", 403);
+                return;
+            }
+                
             if (data.Contains("QUIT"))
             {
                 SendStatus(stream, "Successfully logged out", 499);
@@ -144,16 +167,16 @@ namespace Request
                 return;
             }
             if (data.Contains("GET"))
-                CheckMessage(stream, data, "GET",messageList, ref user);
+                CheckMessage(stream, data, "GET",messageList, user);
             else
             if (data.Contains("POST"))
-                CheckMessage(stream, data, "POST",  messageList, ref user);
+                CheckMessage(stream, data, "POST",  messageList, user);
             else
             if (data.Contains("PUT"))
-                CheckMessage(stream, data, "PUT",   messageList, ref user);
+                CheckMessage(stream, data, "PUT",   messageList, user);
             else
             if (data.Contains("DELETE"))
-                CheckMessage(stream, data, "DELETE",messageList, ref user);
+                CheckMessage(stream, data, "DELETE",messageList, user);
             
                     
             //string response = "Hallo";

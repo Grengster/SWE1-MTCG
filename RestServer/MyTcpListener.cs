@@ -9,6 +9,7 @@ using System.Threading;
 using Request;
 using DatabaseHandler;
 using RestServer;
+using System.Diagnostics;
 
 namespace MockServer
 {
@@ -86,7 +87,7 @@ namespace MockServer
                     while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
                     {
                         data = Encoding.ASCII.GetString(bytes, 0, i);
-                        handler.GetPostFunct(data, messageList, stream, client, ref user, ref userConnected);
+                        handler.GetPostFunct(data, messageList, stream, client, user, ref userConnected);
                         if (!userConnected)
                             break;
                     }
@@ -96,6 +97,7 @@ namespace MockServer
                     Console.WriteLine("Exception: {0}", e.ToString());
                     stream.Close();
                     client.Close();
+                    userConnected = false;
                 }
             }
             data = null;

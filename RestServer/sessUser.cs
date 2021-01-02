@@ -6,7 +6,7 @@ namespace RestServer
 {
     public class SessUser
     {
-        private string username="", password="";
+        public string username="", password="";
         private DateTime lastlogin;
         public SessUser()
         {
