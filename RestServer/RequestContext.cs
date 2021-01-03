@@ -18,7 +18,7 @@ namespace Request
 {
     public class RequestContext
     {
-        DatabaseHandlerClass database = new DatabaseHandlerClass();
+        readonly DatabaseHandlerClass database = new DatabaseHandlerClass();
         public RequestContext(){ database.DBConnect(); }
 
         public void SendStatus(  NetworkStream stream, string message, int statuscode)
@@ -61,7 +61,7 @@ namespace Request
             };
         }
 
-        public void CheckMessage(NetworkStream stream, string data, string RqstType, List<string> messageList, SessUser user)
+        public void CheckMessage(NetworkStream stream, string data, string RqstType, SessUser user)
         {
             Console.WriteLine(data);
             if (data.Contains(RqstType))
@@ -108,9 +108,11 @@ namespace Request
                             if (database.LoginUser(userJson.Username, userJson.Password, user) == 1) //go into database and use name & pwd from json decoded class
                             {
                                 SendStatus(stream, "Logged in as: " + user.GetUser(), 200);
-                            } 
-                            else
-                                SendStatus(stream, "WRONG PASSWORD/USERNAME", 403);
+                            }
+                            else if (database.LoginUser(userJson.Username, userJson.Password, user) == -1)
+                                SendStatus(stream, "WRONG PASSWORD OR USERNAME", 403);
+                            else if (database.LoginUser(userJson.Username, userJson.Password, user) == -2)
+                                SendStatus(stream, "ALREADY LOGGED IN AS USER: " + user.username, 403);
                         }
                         
                     }
@@ -119,18 +121,22 @@ namespace Request
                     else 
                         SendStatus(stream, "ERROR", 404);
                 }
-                if (data.Contains("transactions/packages HTTP/1.1"))
+                else if (data.Contains("transactions/packages HTTP/1.1"))
                 {
                     if (data.Contains("Content-Type: application/json"))
                     {
-                        deckData deck;
-                        if (database.GetDecks(5) != null)
+                        int result = database.GetDecks(user);
+                        if (result == 1)
                         {
-                            deck = database.GetDecks(2);
-                            SendStatus(stream, deck.GetDeckInfo(), 200);
+                            if(user.SeeDeck() != null)
+                                SendStatus(stream, user.SeeDeck(), 200);
+                            else
+                                SendStatus(stream, "DECK EMPTY", 403);
                         }
-                        else
+                        else if(result == -1)
                             SendStatus(stream, "WRONG DECKCODE", 403);
+                        else if (result == -2)
+                            SendStatus(stream, "CARD ALREADY IN DECK", 403);
                     }
                 }
                 else if (data.Contains("/packages HTTP/1.1"))
@@ -152,7 +158,7 @@ namespace Request
             }
         }
 
-        public void GetPostFunct( string data, List<string> messageList, NetworkStream stream, TcpClient client, SessUser user, ref bool userConnected)
+        public void GetPostFunct( string data, NetworkStream stream, SessUser user, ref bool userConnected)
         {
             if(user == null)
             {
@@ -167,16 +173,16 @@ namespace Request
                 return;
             }
             if (data.Contains("GET"))
-                CheckMessage(stream, data, "GET",messageList, user);
+                CheckMessage(stream, data, "GET", user);
             else
             if (data.Contains("POST"))
-                CheckMessage(stream, data, "POST",  messageList, user);
+                CheckMessage(stream, data, "POST", user);
             else
             if (data.Contains("PUT"))
-                CheckMessage(stream, data, "PUT",   messageList, user);
+                CheckMessage(stream, data, "PUT", user);
             else
             if (data.Contains("DELETE"))
-                CheckMessage(stream, data, "DELETE",messageList, user);
+                CheckMessage(stream, data, "DELETE", user);
             
                     
             //string response = "Hallo";

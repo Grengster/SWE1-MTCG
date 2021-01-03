@@ -30,4 +30,9 @@ public class deckData
     {
         return "{\"Id\":\"" + Id + "\", \"Name\":\"" + Name + "\", \"Damage\":" + Damage  + "}";
     }
+
+    public string UserDeckInfo()
+    {
+        return "Card-ID: " + Id + "\nCard-Name: " + Name + "\nDamage: " + Damage + "\n";
+    }
 }

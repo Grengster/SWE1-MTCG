@@ -25,7 +25,7 @@ namespace MockServer
 
             return index;
         }
-        public static void Main(string[] args)
+        public static void Main()
         {
             DatabaseHandlerClass databaseServer = new DatabaseHandlerClass();
             databaseServer.DBConnect();
@@ -52,7 +52,6 @@ namespace MockServer
                     Console.WriteLine("Connected!");
                     Thread t = new Thread(UserAction);
                     t.Start(client);
-                    
                 }
             }
             catch (SocketException e)
@@ -69,16 +68,15 @@ namespace MockServer
             Console.Read();
         }
 
-        public static void UserAction(Object obj)
+        public static void UserAction(Object temp)
         {
-            TcpClient client = (TcpClient)obj;
+            TcpClient client = (TcpClient)temp;
             NetworkStream stream = client.GetStream();
             RequestContext handler = new RequestContext();
-            List<string> messageList = new List<string>();
-            string data = null;
+            string data;
             Byte[] bytes = new Byte[2048];
-            int i;
             SessUser user = new SessUser();
+            int i;
             bool userConnected = true;
             while(userConnected)
             {
@@ -87,7 +85,7 @@ namespace MockServer
                     while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
                     {
                         data = Encoding.ASCII.GetString(bytes, 0, i);
-                        handler.GetPostFunct(data, messageList, stream, client, user, ref userConnected);
+                        handler.GetPostFunct(data, stream, user, ref userConnected);
                         if (!userConnected)
                             break;
                     }
@@ -100,7 +98,6 @@ namespace MockServer
                     userConnected = false;
                 }
             }
-            data = null;
             stream.Close();
             client.Close();
         }
