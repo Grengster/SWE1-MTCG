@@ -25,8 +25,12 @@ namespace MockServer
 
             return index;
         }
+
+        public static Dictionary<string, SessUser> loggedUsers = new Dictionary<string, SessUser>();
+
         public static void Main()
         {
+            
             DatabaseHandlerClass databaseServer = new DatabaseHandlerClass();
             databaseServer.DBConnect();
             TcpListener server = null;
@@ -42,16 +46,22 @@ namespace MockServer
                 // Start listening for client requests.
                 server.Start();
 
+                //LIST/DICTIONARY HERE
+
                 // Buffer for reading data
 
                 // Enter the listening loop.
                 while (true)
                 {
-                    Console.WriteLine("Waiting for a connection...");
-                    TcpClient client = server.AcceptTcpClient();
-                    Console.WriteLine("Connected!");
-                    Thread t = new Thread(UserAction);
-                    t.Start(client);
+                    if(server.Pending())
+                    {
+                        Console.WriteLine("Waiting for a connection...");
+                        TcpClient client = server.AcceptTcpClient();
+                        Console.WriteLine("Connected!");
+                        Thread t = new Thread(UserAction);
+                        t.Start(client);
+                        Console.WriteLine("Started Thread: " + t.ManagedThreadId);
+                    }
                 }
             }
             catch (SocketException e)
@@ -60,6 +70,7 @@ namespace MockServer
             }
             finally
             {
+                loggedUsers.Clear();
                 // Stop listening for new clients.
                 server.Stop();
             }
@@ -78,16 +89,30 @@ namespace MockServer
             SessUser user = new SessUser();
             int i;
             bool userConnected = true;
-            while(userConnected)
+            while (userConnected)
             {
                 try
                 {
                     while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
                     {
+                        int pFrom = 0, pTo = 0;
                         data = Encoding.ASCII.GetString(bytes, 0, i);
-                        handler.GetPostFunct(data, stream, user, ref userConnected);
+                        if(data.Contains("Username\":\""))
+                        {
+                            pFrom = data.IndexOf("Username\":\"") + "Username\":\"".Length;
+                            pTo = data.LastIndexOf("\",");
+                        }
+                        if (data.Contains("Authorization:"))
+                        {
+                            pFrom = data.IndexOf("Basic ") + "Basic ".Length;
+                            pTo = data.LastIndexOf("-mtcgToken");
+                        }
+                        String result = data[pFrom..pTo];
+                        user.username = result;
+                        handler.GetPostFunct(data, stream, ref user, ref userConnected);
                         if (!userConnected)
                             break;
+
                     }
                 }
                 catch (Exception e)
@@ -96,12 +121,12 @@ namespace MockServer
                     stream.Close();
                     client.Close();
                     userConnected = false;
+                    if (MyTcpListener.loggedUsers.ContainsKey(user.username))
+                        MyTcpListener.loggedUsers.Remove(user.username);
                 }
             }
             stream.Close();
             client.Close();
         }
-
-
     }
 }

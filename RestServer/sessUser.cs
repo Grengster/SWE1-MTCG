@@ -8,10 +8,9 @@ namespace RestServer
     {
         public string username="", password="";
         private DateTime lastlogin;
-        public List<deckData> userDeck;
+        public List<deckData> userDeck = new List<deckData>();
         public SessUser()
         {
-            
         }
 
         public void setUser(string name, string pwd)
@@ -25,11 +24,11 @@ namespace RestServer
             return "Here is your name: " + username + "\nLast login: " + GetLastLogin();
         }
 
-        public string SeeDeck()
+        public string SeeDeck(SessUser user)
         {
             string output = "Decklist:\n";
             bool deckFilled = false;
-            foreach (var deckData in userDeck)
+            foreach (var deckData in user.userDeck)
             {
                 output = output + deckData.UserDeckInfo() + "\n";
                 deckFilled = true;

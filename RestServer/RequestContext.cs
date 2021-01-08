@@ -12,7 +12,7 @@ using Newtonsoft.Json;
 using DatabaseHandler;
 using System.Xml.XPath;
 using RestServer;
-
+using MockServer;
 
 namespace Request
 {
@@ -20,6 +20,8 @@ namespace Request
     {
         readonly DatabaseHandlerClass database = new DatabaseHandlerClass();
         public RequestContext(){ database.DBConnect(); }
+
+        public string currUser = "";
 
         public void SendStatus(  NetworkStream stream, string message, int statuscode)
         {
@@ -48,6 +50,7 @@ namespace Request
             byte[] sendBytes = Encoding.ASCII.GetBytes(serverResponse);
             stream.Write(sendBytes, 0, sendBytes.Length);
             stream.Flush();
+            return;
         }
 
         public bool CheckError(string RqstType)
@@ -61,14 +64,14 @@ namespace Request
             };
         }
 
-        public void CheckMessage(NetworkStream stream, string data, string RqstType, SessUser user)
+        public void CheckMessage(NetworkStream stream, string data, string RqstType, ref SessUser user)
         {
             Console.WriteLine(data);
             if (data.Contains(RqstType))
             {
                 if (!CheckError(RqstType))
                 {
-                    StreamPost(stream, data, RqstType, user);
+                    StreamPost(stream, data, RqstType,ref user);
                 }
                 else
                     SendStatus(stream, "FORBIDDEN", 403);
@@ -81,7 +84,7 @@ namespace Request
 
 
 
-        public void StreamPost(NetworkStream stream, string data, string RqstType, SessUser user)
+        public void StreamPost(NetworkStream stream, string data, string RqstType, ref SessUser user)
         {
             if (RqstType == "POST")
             {
@@ -105,31 +108,38 @@ namespace Request
                         }
                         if (data.Contains("/sessions HTTP/1.1"))
                         {
-                            if (database.LoginUser(userJson.Username, userJson.Password, user) == 1) //go into database and use name & pwd from json decoded class
+                            int resultLogin = database.LoginUser(userJson.Username, userJson.Password, ref user);
+                            if (resultLogin == 1) //go into database and use name & pwd from json decoded class
                             {
-                                SendStatus(stream, "Logged in as: " + user.GetUser(), 200);
+                                SendStatus(stream, "Logged in as: " + MyTcpListener.loggedUsers[user.username].username, 200);
                             }
-                            else if (database.LoginUser(userJson.Username, userJson.Password, user) == -1)
+                            else if (resultLogin == -1)
                                 SendStatus(stream, "WRONG PASSWORD OR USERNAME", 403);
-                            else if (database.LoginUser(userJson.Username, userJson.Password, user) == -2)
-                                SendStatus(stream, "ALREADY LOGGED IN AS USER: " + user.username, 403);
+                            else if (resultLogin == -2)
+                                SendStatus(stream, "ALREADY LOGGED IN AS USER: " + MyTcpListener.loggedUsers[userJson.Username].username, 403);
+                            else if (resultLogin == 2)
+                                SendStatus(stream, "Welcome, " + MyTcpListener.loggedUsers[userJson.Username].username + ".\n Your cards are: " + MyTcpListener.loggedUsers[userJson.Username].SeeDeck(MyTcpListener.loggedUsers[userJson.Username]), 403);
+                            else
+                                SendStatus(stream, "UNKOWN ERROR", 403);
                         }
-                        
+
                     }
                     //else if()
 
-                    else 
+                    else
                         SendStatus(stream, "ERROR", 404);
                 }
+                else if (!MyTcpListener.loggedUsers.ContainsKey(user.username))
+                    SendStatus(stream, "LOGIN FIRST AAAAAAAAAA", 403);
                 else if (data.Contains("transactions/packages HTTP/1.1"))
                 {
                     if (data.Contains("Content-Type: application/json"))
                     {
-                        int result = database.GetDecks(user);
+                        int result = database.GetDecks(MyTcpListener.loggedUsers[user.username]);
                         if (result == 1)
                         {
-                            if(user.SeeDeck() != null)
-                                SendStatus(stream, user.SeeDeck(), 200);
+                            if(user.SeeDeck(MyTcpListener.loggedUsers[user.username]) != null)
+                                SendStatus(stream, MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
                             else
                                 SendStatus(stream, "DECK EMPTY", 403);
                         }
@@ -137,6 +147,8 @@ namespace Request
                             SendStatus(stream, "WRONG DECKCODE", 403);
                         else if (result == -2)
                             SendStatus(stream, "CARD ALREADY IN DECK", 403);
+                        else if (result == -3)
+                            SendStatus(stream, "NO BALANCE", 403);
                     }
                 }
                 else if (data.Contains("/packages HTTP/1.1"))
@@ -148,7 +160,7 @@ namespace Request
                     result = "{ \"card\": [{" + result + "}]}";
                     RootObject test = JsonConvert.DeserializeObject<RootObject>(result);
                     Console.WriteLine(test.card[0]);
-                    if(database.SetDecks(test.card, user))
+                    if(database.SetDecks(test.card,ref user))
                         SendStatus(stream, "INSERT SUCCESS", 200);
                     else
                         SendStatus(stream, "ERROR EXECUTING COMMAND", 403);
@@ -156,9 +168,22 @@ namespace Request
                 else
                     SendStatus(stream, "WRONG COMMAND", 403);
             }
+            if (RqstType == "GET")
+            {
+                if (data.Contains("/cards HTTP/1.1"))
+                {
+                    int result = database.RetrieveCards(MyTcpListener.loggedUsers[user.username]);
+                    if (result == 1)
+                        SendStatus(stream, "NO DECKS IN CARDS", 200);
+                    if (result == 2)
+                        SendStatus(stream, "Your deck: \n" + MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
+                }  
+                else
+                    SendStatus(stream, "WRONG COMMAND", 403);
+            }
         }
 
-        public void GetPostFunct( string data, NetworkStream stream, SessUser user, ref bool userConnected)
+        public void GetPostFunct( string data, NetworkStream stream, ref SessUser user, ref bool userConnected)
         {
             if(user == null)
             {
@@ -166,23 +191,24 @@ namespace Request
                 return;
             }
                 
-            if (data.Contains("QUIT"))
+            if (data.Contains("QUIT") || data.Contains("quit") && MyTcpListener.loggedUsers.ContainsKey(user.username))
             {
+                MyTcpListener.loggedUsers.Remove(user.username);
                 SendStatus(stream, "Successfully logged out", 499);
                 userConnected = false;
                 return;
             }
             if (data.Contains("GET"))
-                CheckMessage(stream, data, "GET", user);
+                CheckMessage(stream, data, "GET",ref user);
             else
             if (data.Contains("POST"))
-                CheckMessage(stream, data, "POST", user);
+                CheckMessage(stream, data, "POST",ref user);
             else
             if (data.Contains("PUT"))
-                CheckMessage(stream, data, "PUT", user);
+                CheckMessage(stream, data, "PUT",ref user);
             else
             if (data.Contains("DELETE"))
-                CheckMessage(stream, data, "DELETE", user);
+                CheckMessage(stream, data, "DELETE",ref user);
             
                     
             //string response = "Hallo";

@@ -16,6 +16,7 @@ using DatabaseHandler;
 using System.Xml.XPath;
 using NpgsqlTypes;
 using System.ComponentModel;
+using MockServer;
 
 namespace DatabaseHandler
 {
@@ -81,9 +82,9 @@ namespace DatabaseHandler
 
 
 
-        public int LoginUser(string username, string pass, SessUser user)
+        public int LoginUser(string username, string pass, ref SessUser user)
         {
-            if(user.username != "")
+            if (MyTcpListener.loggedUsers.ContainsKey(user.username))
                 return -2;
             using var cmd = new NpgsqlCommand("SELECT * FROM \"user\" WHERE username = @u AND user_pwd = @p", conn);
             cmd.Parameters.AddWithValue("u", username);
@@ -107,7 +108,9 @@ namespace DatabaseHandler
                 DateTime time = DateTime.Now;              // Use current time
                 string format = "yyyy-MM-dd HH:mm:ss";    // modify the format depending upon input required in the column in 
                 Console.WriteLine("\nSuccessfully logged in!");
-                user.setUser(username, pass);
+                MyTcpListener.loggedUsers.Add(user.username, user);
+                MyTcpListener.loggedUsers[user.username].setUser(user.username, user.password);
+                Console.WriteLine(MyTcpListener.loggedUsers[user.username].GetInfo());
                 using (var cmd2 = new NpgsqlCommand($"SELECT lastlogin FROM \"user\" WHERE username = @u", conn))
                 {
                     cmd2.Parameters.AddWithValue("u", username);
@@ -125,6 +128,10 @@ namespace DatabaseHandler
                     cmd3.Parameters.AddWithValue("t", time.ToString(format));
                     cmd3.ExecuteNonQuery();
                 }
+
+                RetrieveCards(MyTcpListener.loggedUsers[user.username]);
+
+
                 return 1;
             }
         }
@@ -132,23 +139,42 @@ namespace DatabaseHandler
 
         public int GetDecks(SessUser user)
         {
-            var rand = new Random(); //instantiate random generator
-            using var cmd1 = new NpgsqlCommand("SELECT COUNT(*)/5 FROM decks", connTemp);
+            if (!MyTcpListener.loggedUsers.ContainsKey(user.username))
+                return -2;
+
+            using var cmd1 = new NpgsqlCommand("SELECT curr_balance FROM \"user\" WHERE username = @a", connTemp);
+            cmd1.Parameters.AddWithValue("a", user.username);
             cmd1.ExecuteNonQuery();
-            int decknumbers = 0;
             using var readerTmp = cmd1.ExecuteReader();
+            int balance = 0;
             while (readerTmp.Read())
             {
-                decknumbers = readerTmp.GetInt32(0);
+                balance = readerTmp.GetInt32(0);
+                Console.WriteLine("----" + balance + "----");
+                break;
+            }
+            connTemp.Close();
+            connTemp.Open();
+            if (balance - 5 < 0)
+                return -3;
+
+            var rand = new Random(); //instantiate random generator
+            using var cmd2 = new NpgsqlCommand("SELECT deckid FROM decks WHERE deckowner IS NULL", connTemp);
+            cmd2.ExecuteNonQuery();
+            int decknumbers = 0;
+            using var readerTmp1 = cmd2.ExecuteReader();
+            while (readerTmp1.Read())
+            {
+                decknumbers = readerTmp1.GetInt32(0);
                 break;
             }
 
             string deckJson = "";
-            int selectDeck = rand.Next(1, decknumbers);
+            //int selectDeck = rand.Next(1, decknumbers);
             // Retrieve all rows
             using var cmd = new NpgsqlCommand("SELECT * FROM decks WHERE deckId = @n AND deckowner IS NULL", conn);
-            Console.WriteLine(selectDeck);
-            cmd.Parameters.AddWithValue("n", selectDeck);
+            Console.WriteLine(decknumbers);
+            cmd.Parameters.AddWithValue("n", decknumbers);
             cmd.ExecuteNonQuery();
             bool isFound = false;
             int count = 0;
@@ -171,6 +197,7 @@ namespace DatabaseHandler
                 }
             if (!isFound)
             {
+                Console.WriteLine("WEEEE " + decknumbers + " REEEEEE");
                 Console.WriteLine("\nNo deck was found with that number!");
                 return -1;
             }
@@ -179,23 +206,97 @@ namespace DatabaseHandler
 
                 RootObject test = JsonConvert.DeserializeObject<RootObject>(deckJson);
                 count = 0;
-
-                foreach (var userDeckData in user.userDeck)
+                if(MyTcpListener.loggedUsers[user.username].userDeck != null)
                 {
-                    if (user.userDeck[count].GetId() == test.card[count].GetId())
-                        return -2;
-                    count++;
+                    foreach (var userDeckData in MyTcpListener.loggedUsers[user.username].userDeck)
+                    {
+                        if (MyTcpListener.loggedUsers[user.username].userDeck[count].GetId() == test.card[count].GetId())
+                            return -2;
+                        count++;
+                    }
                 }
-                user.userDeck = test.card;
-                Console.WriteLine(user.SeeDeck());
+
+                connTemp.Close();
+                connTemp.Open();
+
+                using var cmd3 = new NpgsqlCommand("UPDATE decks SET deckowner = @b WHERE deckId = @n AND deckowner IS NULL", connTemp);
+                cmd3.Parameters.AddWithValue("b", user.username);
+                cmd3.Parameters.AddWithValue("n", decknumbers);
+                cmd3.ExecuteNonQuery();
+
+
+                MyTcpListener.loggedUsers[user.username].userDeck = test.card;
+                Console.WriteLine(user.SeeDeck(MyTcpListener.loggedUsers[user.username]));
+
+                if (balance - 5 >= 0)
+                {
+                    connTemp.Close();
+                    connTemp.Open();
+                    using var cmd4 = new NpgsqlCommand("UPDATE \"user\" SET curr_balance = @b WHERE username = @a", connTemp);
+                    cmd4.Parameters.AddWithValue("b", balance - 5);
+                    cmd4.Parameters.AddWithValue("a", user.username);
+                    cmd4.ExecuteNonQuery();
+                    Console.WriteLine("BALANCE SET TO " + (balance - 5));
+                    connTemp.Close();
+                    connTemp.Open();
+                }
                     return 1;
             }
         }
 
 
-
-        public bool SetDecks(List<deckData> results, SessUser user)
+        public int RetrieveCards(SessUser user)
         {
+            string tempJson = "{ \"card\": [";
+            connTemp.Close();
+            connTemp.Open();
+
+            bool CardIsFound = false;
+            using var cmd4 = new NpgsqlCommand($"SELECT cards FROM decks WHERE deckowner = @u", connTemp);
+            cmd4.Parameters.AddWithValue("u", user.username);
+            cmd4.ExecuteNonQuery();
+            using var reader2 = cmd4.ExecuteReader();
+            while (reader2.Read())
+            {
+                //Console.WriteLine(reader.GetInt32(0)); GET THE ID OR FOR STRING ToString(0
+                tempJson = tempJson + reader2.GetString(0) + ",";
+                CardIsFound = true;
+            }
+            tempJson += "]}";
+            Console.WriteLine(tempJson);
+
+
+            if (!CardIsFound)
+                return 1; //no cards
+            else if (CardIsFound)
+            {
+                RootObject test = JsonConvert.DeserializeObject<RootObject>(tempJson);
+
+                int count = 0;
+                foreach (var userDeckData in test.card)
+                {
+                    if (MyTcpListener.loggedUsers[user.username].userDeck.Any(p => p.Id == test.card[count].Id))
+                        count++;
+                    else
+                    {
+                        MyTcpListener.loggedUsers[user.username].userDeck.Add(test.card[count]);
+                        count++;
+                    }
+                }
+
+                return 2;
+            }
+            return 1;
+        }
+
+
+
+        public bool SetDecks(List<deckData> results, ref SessUser user)
+        {
+            if (!MyTcpListener.loggedUsers.ContainsKey(user.username))
+                return false;
+            if(MyTcpListener.loggedUsers[user.username].username != "admin")
+                return false;
             using var cmd1 = new NpgsqlCommand("SELECT COUNT(*) FROM decks", connTemp);
             cmd1.ExecuteNonQuery();
             int decknumbers = 0;
@@ -203,11 +304,9 @@ namespace DatabaseHandler
             while (reader.Read())
             {
                 decknumbers = reader.GetInt32(0);
-                break;
+                break;  
             }
             Console.WriteLine(user.GetUser()); //still doesnt work, dont know why, dont care why
-            //if(user.username != "admin")
-            //    return false;
             bool working = true;
             foreach (var deckData in results)
             {
