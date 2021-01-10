@@ -10,6 +10,7 @@ using Request;
 using DatabaseHandler;
 using RestServer;
 using System.Diagnostics;
+using FightQueueClass;
 
 namespace MockServer
 {
@@ -28,7 +29,7 @@ namespace MockServer
 
         public static Dictionary<string, SessUser> loggedUsers = new Dictionary<string, SessUser>();
         public static List <string> onlineUsers = new List<string>();
-        public static List<SessUser> fightQueue = new List<SessUser>();
+        public static List<FightQueue> fightQueue = new List<FightQueue>();
         public static void Main()
         {
             

@@ -15,6 +15,7 @@ using RestServer;
 using MockServer;
 using System.Collections.Specialized;
 using BattleHandler;
+using FightQueueClass;
 
 namespace Request
 {
@@ -101,7 +102,7 @@ namespace Request
                         String result = data[pFrom..pTo];
                         result = "{" + result + "}";
                         Userdata userJson = JsonConvert.DeserializeObject<Userdata>(result);
-                        //user.setUser(userJson.Username, userJson.Password);
+                        //user.SetUser(userJson.Username, userJson.Password);
                         if (data.Contains("/users HTTP/1.1"))
                         {
                             if (database.RegisterUser(userJson.Username, userJson.Password)) //go into database and use name & pwd from json decoded class
@@ -139,10 +140,10 @@ namespace Request
                     if (data.Contains("Content-Type: application/json"))
                     {
                         int result = database.GetDecks(MyTcpListener.loggedUsers[user.username]);
-                        if (result == 1)
+                        if (result >= 0)
                         {
                             if(user.SeeDeck(MyTcpListener.loggedUsers[user.username]) != null)
-                                SendStatus(stream, MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
+                                SendStatus(stream, "Balance: " + result + "\n" + MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
                             else
                                 SendStatus(stream, "DECK EMPTY", 403);
                         }
@@ -172,42 +173,78 @@ namespace Request
                 {
                     if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
                     {
-                        bool battleOver = false;
-                        MyTcpListener.loggedUsers[user.username].readyToFight = true;
-                        if(!MyTcpListener.fightQueue.Contains(user))
-                            MyTcpListener.fightQueue.Add(user);
-                        while(!battleOver)
+                        //MyTcpListener.loggedUsers[user.username].readyToFight = true;
+                        string usernameTemp = user.username;
+
+                        if (MyTcpListener.fightQueue.Count() >= 1)
                         {
-                            if (MyTcpListener.fightQueue.Count() > 1)
+
+                            for (int i = 0; i < MyTcpListener.fightQueue.Count(); i++)
                             {
-                                for (int i = 0; i < MyTcpListener.fightQueue.Count(); i++)
+                                if (MyTcpListener.fightQueue[i].Player2 == null && MyTcpListener.fightQueue[i].Player1 != MyTcpListener.loggedUsers[user.username])
                                 {
-                                    if (MyTcpListener.fightQueue[i].username != user.username)
+                                    MyTcpListener.fightQueue[i].Player2 = MyTcpListener.loggedUsers[user.username];
+                                    MyTcpListener.fightQueue[i].BattleLog = battlehandler.StartBattle(MyTcpListener.fightQueue[i].Player1, MyTcpListener.fightQueue[i].Player2);
+                                    MyTcpListener.fightQueue[i].FightOver = true;
+                                    if (MyTcpListener.fightQueue[i].BattleLog == "Player1Err")
                                     {
-                                        string battleLog = battlehandler.startBattle(MyTcpListener.loggedUsers[MyTcpListener.fightQueue[i].username], MyTcpListener.loggedUsers[user.username]);
-                                        if (battleLog == "Player1Err")
+                                        SendStatus(stream, "PLAYER 1 DOESNT HAVE A VALID DECK", 403);
+                                        break;
+                                    }
+                                    else if (MyTcpListener.fightQueue[i].BattleLog == "Player2Err")
+                                    {
+                                        SendStatus(stream, "PLAYER 2 DOESNT HAVE A VALID DECK", 403);
+                                        break;
+                                    }
+                                    else
+                                    {
+                                        SendStatus(stream, MyTcpListener.fightQueue[i].BattleLog, 200);
+                                        if(MyTcpListener.fightQueue[i].BattleLog[0] == '1' || MyTcpListener.fightQueue[i].BattleLog[0] == '2')
+                                            database.TakeOverDeck(MyTcpListener.fightQueue[i].Player1, MyTcpListener.fightQueue[i].Player2, MyTcpListener.fightQueue[i].BattleLog[0]);
+                                        if (MyTcpListener.fightQueue[i].BattleLog[0] == '1')
                                         {
-                                            SendStatus(stream, "PLAYER 1 DOESNT HAVE A VALID DECK", 403);
-                                            battleOver = true;
+                                            var P1Temp = MyTcpListener.fightQueue[i].Player1;
+                                            var P2Temp = MyTcpListener.fightQueue[i].Player2;
+                                            database.CheckStats(P1Temp, "get", 0, 0, 0);
+                                            database.CheckStats(P1Temp, "set", P1Temp.points + 5, P1Temp.wins+1, P1Temp.losses);
+                                            database.CheckStats(P2Temp, "get", 0, 0, 0);
+                                            database.CheckStats(P2Temp, "set", P2Temp.points - 5, P2Temp.wins, P2Temp.losses + 1);
                                         }
-                                        else if (battleLog == "Player2Err")
+                                        if (MyTcpListener.fightQueue[i].BattleLog[0] == '2')
                                         {
-                                            SendStatus(stream, "PLAYER 2 DOESNT HAVE A VALID DECK", 403);
-                                            battleOver = true;
+                                            var P1Temp = MyTcpListener.fightQueue[i].Player1;
+                                            var P2Temp = MyTcpListener.fightQueue[i].Player2;
+                                            database.CheckStats(P1Temp, "get", 0, 0, 0);
+                                            database.CheckStats(P1Temp, "set", P1Temp.points - 5, P1Temp.wins, P1Temp.losses + 1);
+                                            database.CheckStats(P2Temp, "get", 0, 0, 0);
+                                            database.CheckStats(P2Temp, "set", P2Temp.points + 5, P2Temp.wins + 1, P2Temp.losses);
                                         }
-                                        else
-                                        {
-                                            SendStatus(stream, battleLog, 200);
-                                            MyTcpListener.fightQueue.RemoveAt(i);
-                                            MyTcpListener.fightQueue.Remove(user);
-                                            battleOver = true;
-                                        }
-                                            
+                                        MyTcpListener.fightQueue.RemoveAt(i);
+                                        break;
                                     }
 
                                 }
+
                             }
-                            Console.WriteLine("Waiting for second player...");
+                        }
+                        else if (!MyTcpListener.fightQueue.Any(p => p.Player1 == MyTcpListener.loggedUsers[usernameTemp]))
+                        {
+                            FightQueue battle = new FightQueue() { Player1 = MyTcpListener.loggedUsers[user.username] };
+                            MyTcpListener.fightQueue.Add(battle);
+                            while (!battle.FightOver)
+                            {
+                                Console.WriteLine("Waiting for second player...");
+                            }
+                            if (battle.BattleLog == "Player1Err")
+                            {
+                                SendStatus(stream, "PLAYER 1 DOESNT HAVE A VALID DECK", 403);
+                            }
+                            else if (battle.BattleLog == "Player2Err")
+                            {
+                                SendStatus(stream, "PLAYER 2 DOESNT HAVE A VALID DECK", 403);
+                            }
+                            else
+                                SendStatus(stream, battle.BattleLog, 200);
                         }
                     }
                     else
@@ -313,7 +350,7 @@ namespace Request
                             if (resultFunc == 1)
                                 SendStatus(stream, "SET INFO:\n" + MyTcpListener.loggedUsers[user.username].SeeUserInfo(MyTcpListener.loggedUsers[user.username]), 200);
                             else if (resultFunc == -1)
-                                SendStatus(stream, "ERROR" , 403);
+                                SendStatus(stream, "ERROR, WRONG INFO" , 403);
                         }
                     }
                     else

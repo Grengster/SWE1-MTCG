@@ -4,10 +4,10 @@ using System.Collections.Generic;
 public class RootObject
 {
     public int cardCount { get; set; }
-    public List <deckData> card { get; set; }
+    public List <DeckData> card { get; set; }
 }
 
-public class deckData
+public class DeckData
 {
     public string Id { get; set; }
     public string Name { get; set; }

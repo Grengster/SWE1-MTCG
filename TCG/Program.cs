@@ -7,7 +7,7 @@ namespace TCG.Card
     public class Program
     {
         
-        static void Main(string[] args)
+        static void Main()
         {
             Necromancer necro = new Necromancer();
             Orc orc = new Orc();

@@ -21,13 +21,14 @@ using System.Runtime.InteropServices.WindowsRuntime;
 
 namespace BattleHandler
 {
-    class BattleHandlerClass
+    public class BattleHandlerClass
     {
-        public string startBattle(SessUser player1, SessUser player2)
+        public string StartBattle(SessUser player1, SessUser player2)
         {
             string battleLog = "Battlelog:\n";
-            var P1Deck = MyTcpListener.loggedUsers[player1.username].userDeck;
-            var P2Deck = MyTcpListener.loggedUsers[player2.username].userDeck;
+
+            var P1Deck = new List<DeckData>(MyTcpListener.loggedUsers[player1.username].userDeck);
+            var P2Deck = new List<DeckData>(MyTcpListener.loggedUsers[player2.username].userDeck);
             //MyTcpListener.loggedUsers[player1.username]
             int roundCount = 1;
             //int p1Health = 100, p2Health = 100;
@@ -36,18 +37,7 @@ namespace BattleHandler
             if (P2Deck.Count() != 4)
                 return "Player2Err";
             var rand = new Random();
-            //int startplayer = rand.Next(1, 2);
-            //if (startplayer == 2)
-            //{
-            //    battleLog += "Player 2 begins.\n";
-            //    SessUser tempPlayer;
-            //    tempPlayer = player1;
-            //    player1 = player2;
-            //    player2 = tempPlayer;
-            //}
-            //else
-                //battleLog += "Player 1 begins.\n";
-            while (P1Deck.Count() != 0 || P2Deck.Count() != 0 || roundCount <= 101)
+            while (P1Deck.Count() != 0 && P2Deck.Count() != 0 && roundCount <= 100)
             {
                 int randomCardP1 = rand.Next(0, P1Deck.Count());
                 int randomCardP2 = rand.Next(0, P2Deck.Count());
@@ -56,24 +46,12 @@ namespace BattleHandler
                     battleLog += "Round Nr." + roundCount + "\nPlayer 1's Card [Damage: " + P1Deck[randomCardP1].Damage + "] defeated Player 2's Card [Damage: " + P2Deck[randomCardP2].Damage + "]\n";
                     P1Deck.Add(P2Deck[randomCardP2]);
                     P2Deck.RemoveAt(randomCardP2);
-                    for (int i = randomCardP2; i < P2Deck.Count(); i++)
-                    {
-                        if (P2Deck[i + 1] == null)
-                            break;
-                        P2Deck[i] = P2Deck[i + 1];
-                    }
                 }
                 else if(P1Deck[randomCardP1].Damage < P2Deck[randomCardP2].Damage)
                 {
                     battleLog += "Round Nr." + roundCount + "\nPlayer 2's Card [Damage: " + P2Deck[randomCardP2].Damage + "] defeated Player 1's Card [Damage: " + P1Deck[randomCardP1].Damage + "]\n";
                     P2Deck.Add(P1Deck[randomCardP1]);
                     P1Deck.RemoveAt(randomCardP1);
-                    for (int i = randomCardP1; i < P1Deck.Count(); i++)
-                    {
-                        if (P1Deck[i + 1] == null)
-                            break;
-                        P1Deck[i] = P1Deck[i + 1];
-                    }
                 }
                 else
                     battleLog += "Round Nr." + roundCount + "\nPlayer 2's Card [Damage: " + P2Deck[randomCardP2].Damage + "] is equal to Player 1's Card [Damage: " + P1Deck[randomCardP1].Damage + "]\n";
@@ -82,11 +60,11 @@ namespace BattleHandler
                 roundCount++;
             }
             if (P1Deck.Count() > 4)
-                battleLog += "Player 1 won the battle, he took Player 2's Deck.";
+                battleLog = "1" + battleLog + "Player 1 won the battle, he took Player 2's Deck.";
             else if (P2Deck.Count() > 4)
-                battleLog += "Player 2 won the battle, he took Player 1's Deck.";
+                battleLog = "2" + battleLog + "Player 2 won the battle, he took Player 1's Deck.";
             else
-                battleLog += "Nobody won, it's a draw!";
+                battleLog = "0" + battleLog + "Nobody won, it's a draw!";
 
 
             return battleLog;

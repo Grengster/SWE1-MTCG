@@ -22,7 +22,6 @@ I corrected my problem of the threading-data-loss at the end by storing all curr
     Unlike probably all of my colleagues, I "pushed and pulled" the cards as single json strings inside the DB, where I could easily serialize them for uploading into the DB and then easily de-serialize them for inserting them inside the deck class of the user.
     This was the hardest task and a pitfall as I had to experiment a lot with the JSON strings, classes and how to make them work with each other, in which I finally succeeded.
     I could work with the created dictionary, insert new users, which also created new decks inside them and so on, so it was really tightly combined with everything and I had to be careful to not forget any errors or bugs while working with my more-complex-than-it-needed-to-be-design.
-	A big problem was that my design with using JSON as a main way of getting/setting decks was very time-consuming to find the bugs, fix them and make it work. So I only had less time for the battle than I expected.
 
 - End of the Project:
 
@@ -42,25 +41,20 @@ I corrected my problem of the threading-data-loss at the end by storing all curr
 - ##### Successfully understanding and using the JSON-Deserializer:
     Around 15 hours of work from the 2.1 to the 4.1 while having lots of problems with the syntax and JSON parser errors, plus creating a list out of a class was new to me, but really helpful.
 
-- ###### Creating the rest functions as viewing decks, inserting cards, buying/setting packages:
+-  #####  Creating the rest functions as viewing decks, inserting cards, buying/setting packages:
     Around 11 hours of work beginning from the 4.1 to the 6.1, it was pretty easy but I had to re-do some query-methods as I had to take care of new bugs, features and again, syntax errors.
 
-- ###### Basic battle:
-    Around 10 hours of work from the 25.12 to the 28.12, with figuring out the commands, syntax, etc.
+-  #####  Basic battle:
+    Around 14 hours of work from the 6.1 to the 10.1, there my biggest pitfall, making 2 users fight each other while the program is working in threads was really tough, i finally got it done by creating a dynamic FightQueue List which checks for users and puts them in a fight together. 
 
 
-### Plugins
+### Table Scripts
 
-Dillinger is currently extended with the following plugins. Instructions on how to use them in your own application are linked below.
-
-| Plugin | README |
+| Table | Create-Script |
 | ------ | ------ |
-| Dropbox | [plugins/dropbox/README.md][PlDb] |
-| GitHub | [plugins/github/README.md][PlGh] |
-| Google Drive | [plugins/googledrive/README.md][PlGd] |
-| OneDrive | [plugins/onedrive/README.md][PlOd] |
-| Medium | [plugins/medium/README.md][PlMe] |
-| Google Analytics | [plugins/googleanalytics/README.md][PlGa] |
+| Decks | CREATE TABLE public.decks(cards json NOT NULL,deckowner text COLLATE pg_catalog."default",deckid integer NOTNULL,total integer NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 99999 CACHE 1 ),"inDeck" boolean NOT NULL DEFAULT false,CONSTRAINT decks_pkey PRIMARY KEY (total)) TABLESPACE pg_default; ALTER TABLE public.decks OWNER to postgres; |
+| Stats | CREATE TABLE public.stats(points integer NOT NULL DEFAULT 0,id integer NOT NULL GENERATED ALWAYS AS IDENTITY (INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 99999 CACHE 1 ),wins integer NOT NULL DEFAULT 0,losses integer NOT NULL DEFAULT 0,username text COLLATE pg_catalog."default" NOT NULL DEFAULT 0,CONSTRAINT stats_pkey PRIMARY KEY (id)) |
+| User | CREATE TABLE public."user"(user_id integer NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1MAXVALUE 9999 CACHE 1 ),username text COLLATE pg_catalog."default" NOT NULL,user_pwd text COLLATE pg_catalog."default" NOTNULL,lastlogin timestamp with time zone,curr_balance integer DEFAULT 0,name text COLLATE pg_catalog."default",bio textCOLLATE pg_catalog."default",image text COLLATE pg_catalog."default",CONSTRAINT "User_pkey" PRIMARY KEY (user_id)) |
 
 
 

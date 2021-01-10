@@ -17,6 +17,7 @@ using System.Xml.XPath;
 using NpgsqlTypes;
 using System.ComponentModel;
 using MockServer;
+using System.Collections.Specialized;
 
 namespace DatabaseHandler
 {
@@ -48,10 +49,11 @@ namespace DatabaseHandler
             {
                 DateTime time = DateTime.Now;              // Use current time
                 string format = "yyyy-MM-dd HH:mm:ss";    // modify the format depending upon input required in the column in 
-                using var cmd = new NpgsqlCommand($"INSERT INTO \"user\" (username, user_pwd, lastlogin) VALUES (@u,@p, '" + time.ToString(format) + "')", conn);
+                using var cmd = new NpgsqlCommand($"INSERT INTO \"user\" (username, user_pwd, lastlogin, curr_balance) VALUES (@u,@p, '" + time.ToString(format) + "', @c)", conn);
                 cmd.Parameters.AddWithValue("u", username);
                 cmd.Parameters.AddWithValue("p", MD5Hash(pass));
                 cmd.Parameters.AddWithValue("t", time.ToString(format));
+                cmd.Parameters.AddWithValue("c", 100);
                 cmd.ExecuteNonQuery();
 
                 //INSERT INTO public.stats(points, id, wins, losses, username) VALUES(0, DEFAULT, 0, 0, 'kienboeck');
@@ -108,17 +110,17 @@ namespace DatabaseHandler
                 }
             if (!isFound)
             {
-                Console.WriteLine("\nWrong password or username!");
+                //Console.WriteLine("\nWrong password or username!");
                 return -1;
             }
             else
             {
                 DateTime time = DateTime.Now;              // Use current time
                 string format = "yyyy-MM-dd HH:mm:ss";    // modify the format depending upon input required in the column in 
-                Console.WriteLine("\nSuccessfully logged in!");
+                //Console.WriteLine("\nSuccessfully logged in!");
                 MyTcpListener.loggedUsers.Add(user.username, user);
-                MyTcpListener.loggedUsers[user.username].setUser(user.username, user.password);
-                Console.WriteLine(MyTcpListener.loggedUsers[user.username].GetInfo());
+                MyTcpListener.loggedUsers[user.username].SetUser(user.username, user.password);
+                //Console.WriteLine(MyTcpListener.loggedUsers[user.username].GetInfo());
                 using (var cmd2 = new NpgsqlCommand($"SELECT lastlogin FROM \"user\" WHERE username = @u", conn))
                 {
                     cmd2.Parameters.AddWithValue("u", username);
@@ -208,6 +210,8 @@ namespace DatabaseHandler
             }
             else if (option == "set")
             {
+                if (!jsonData.Contains("Name") || !jsonData.Contains("Bio") || !jsonData.Contains("Image"))
+                    return -1;
                 List<string> userInfo = new List<string>();
                 string tempJson = jsonData;
                 for (int j = 0; j < 3; j++)
@@ -224,7 +228,7 @@ namespace DatabaseHandler
                         {
                             userInfo.Add(tempJson.Substring(posFrom + 2, posTo - posFrom - 1));
                             tempJson = tempJson.Remove(posFrom, posTo - posFrom + 2);
-                            Console.WriteLine("\n" + userInfo[j] + "\n");
+                            //Console.WriteLine("\n" + userInfo[j] + "\n");
                         }
                     }
                 }
@@ -284,7 +288,7 @@ namespace DatabaseHandler
             while (readerTmp.Read())
             {
                 balance = readerTmp.GetInt32(0);
-                Console.WriteLine("----" + balance + "----");
+                //Console.WriteLine("----" + balance + "----");
                 break;
             }
             connTemp.Close();
@@ -331,8 +335,8 @@ namespace DatabaseHandler
                 }
             if (!isFound)
             {
-                Console.WriteLine("WEEEE " + decknumbers + " REEEEEE");
-                Console.WriteLine("\nNo deck was found with that number!");
+                //Console.WriteLine("WEEEE " + decknumbers + " REEEEEE");
+                //Console.WriteLine("\nNo deck was found with that number!");
                 return -1;
             }
             else
@@ -370,11 +374,11 @@ namespace DatabaseHandler
                     cmd4.Parameters.AddWithValue("b", balance - 5);
                     cmd4.Parameters.AddWithValue("a", user.username);
                     cmd4.ExecuteNonQuery();
-                    Console.WriteLine("BALANCE SET TO " + (balance - 5));
+                    //Console.WriteLine("BALANCE SET TO " + (balance - 5));
                     connTemp.Close();
                     connTemp.Open();
                 }
-                    return 1;
+                    return balance;
             }
         }
 
@@ -425,21 +429,14 @@ namespace DatabaseHandler
 
         public int InsertCards(SessUser user, string cardJson)
         {
+
+            if (cardJson == "")
+                return -1;
+
             List <string> cardList = new List<string>();
             string tempJson = "{ \"card\": [";
             string cardTemp = "";
             cardTemp = cardJson;
-
-
-
-            //connTemp.Close();
-            //connTemp.Open();
-
-            //bool CardIsFound = false;
-            //using var cmd3 = new NpgsqlCommand($"UPDATE decks SET inDeck = false WHERE username = @u AND inDeck = true", connTemp);
-            //cmd3.Parameters.AddWithValue("u", user.username);
-            //cmd3.ExecuteNonQuery();
-
 
             connTemp.Close();
             connTemp.Open();
@@ -509,9 +506,77 @@ namespace DatabaseHandler
                 }
                 if (MyTcpListener.loggedUsers[user.username].userDeck.Count() != 4)
                     return -1;
-                Console.WriteLine("------- TEST HERE\n");
-                MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]);
-                Console.WriteLine("\n------- TEST HERE\n");
+                //Console.WriteLine("------- TEST HERE\n");
+                //MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]);
+                //Console.WriteLine("\n------- TEST HERE\n");
+                return 2;
+            }
+            return 1;
+        }
+
+
+
+        public int TakeOverDeck(SessUser player1, SessUser player2, char options)
+        {
+            List<DeckData> jsonCards = new List<DeckData>();
+            if (options == '2')
+            {
+                SessUser tempClass = player1;
+                player1 = player2;
+                player2 = tempClass;
+            }
+            string tempJson = "{ \"card\": [";
+            connTemp.Close();
+            connTemp.Open();
+
+            bool CardIsFound = false;
+            using var cmd4 = new NpgsqlCommand($"SELECT cards FROM decks WHERE deckowner = @u", connTemp);
+            cmd4.Parameters.AddWithValue("u", player2.username);
+            cmd4.ExecuteNonQuery();
+            using var reader2 = cmd4.ExecuteReader();
+            while (reader2.Read())
+            {
+                //Console.WriteLine(reader.GetInt32(0)); GET THE ID OR FOR STRING ToString(0
+                tempJson = tempJson + reader2.GetString(0) + ",";
+                CardIsFound = true;
+            }
+            tempJson += "]}";
+            //Console.WriteLine(tempJson);
+
+
+            if (!CardIsFound)
+                return 1; //no cards
+            else if (CardIsFound)
+            {
+                
+
+                RootObject test = JsonConvert.DeserializeObject<RootObject>(tempJson);
+
+
+                int count = 0;
+                foreach (var userDeckData in test.card)
+                {
+                    if (MyTcpListener.loggedUsers[player2.username].userDeck.Any(p => p.Id == test.card[count].Id))
+                    {
+                        
+                        jsonCards.Add(test.card[count]);
+                        count++;
+
+                    }
+                    else
+                        count++;
+                }
+                foreach(var card in jsonCards)
+                {
+                //Console.WriteLine("\n" + card.GetDeckInfo() + "\n");
+                    connTemp.Close();
+                    connTemp.Open();
+                    using var cmd5 = new NpgsqlCommand($"UPDATE decks SET deckowner = @s WHERE deckowner = @u AND cards = @c", connTemp);
+                    cmd4.Parameters.AddWithValue("s", player1.username);
+                    cmd4.Parameters.AddWithValue("u", player2.username);
+                    cmd4.Parameters.Add(new NpgsqlParameter("c", NpgsqlDbType.Jsonb) { Value = card.GetDeckInfo() });
+                    cmd4.ExecuteNonQuery();
+                }
                 return 2;
             }
             return 1;
@@ -567,7 +632,7 @@ namespace DatabaseHandler
 
 
 
-        public bool SetDecks(List<deckData> results, ref SessUser user)
+        public bool SetDecks(List<DeckData> results, ref SessUser user)
         {
             if (!MyTcpListener.loggedUsers.ContainsKey(user.username))
                 return false;
@@ -582,16 +647,16 @@ namespace DatabaseHandler
                 decknumbers = reader.GetInt32(0);
                 break;  
             }
-            Console.WriteLine(user.GetUser()); //still doesnt work, dont know why, dont care why
+            //Console.WriteLine(user.GetUser()); //still doesnt work, dont know why, dont care why
             bool working = true;
-            foreach (var deckData in results)
+            foreach (var DeckData in results)
             {
                 using var cmd2 = new NpgsqlCommand($"INSERT INTO decks (cards, deckId) VALUES (@i,@d)", conn);
-                cmd2.Parameters.Add(new NpgsqlParameter("i", NpgsqlDbType.Jsonb) { Value = deckData.GetDeckInfo() }); //we need to map the parameters to json
+                cmd2.Parameters.Add(new NpgsqlParameter("i", NpgsqlDbType.Jsonb) { Value = DeckData.GetDeckInfo() }); //we need to map the parameters to json
                 cmd2.Parameters.AddWithValue("d", decknumbers + 1);
                 if (cmd2.ExecuteNonQuery() == 0)
                     working = false;
-                Console.WriteLine(deckData.GetDeckInfo());
+                //Console.WriteLine(DeckData.GetDeckInfo());
 
             }
             if (working)

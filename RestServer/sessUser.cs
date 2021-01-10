@@ -11,12 +11,12 @@ namespace RestServer
         public bool readyToFight = false;
         public bool online = false;
         private DateTime lastlogin;
-        public List<deckData> userDeck = new List<deckData>();
+        public List<DeckData> userDeck = new List<DeckData>();
         public SessUser()
         {
         }
 
-        public void setUser(string name, string pwd)
+        public void SetUser(string name, string pwd)
         {
             username = name;
             password = pwd;
@@ -32,9 +32,9 @@ namespace RestServer
         {
             string output = "Decklist:\n";
             bool deckFilled = false;
-            foreach (var deckData in user.userDeck)
+            foreach (var DeckData in user.userDeck)
             {
-                output = output + deckData.UserDeckInfo() + "\n";
+                output = output + DeckData.UserDeckInfo() + "\n";
                 deckFilled = true;
             }
             if (deckFilled == true)
