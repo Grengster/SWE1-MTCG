@@ -22,6 +22,7 @@ I corrected my problem of the threading-data-loss at the end by storing all curr
     Unlike probably all of my colleagues, I "pushed and pulled" the cards as single json strings inside the DB, where I could easily serialize them for uploading into the DB and then easily de-serialize them for inserting them inside the deck class of the user.
     This was the hardest task and a pitfall as I had to experiment a lot with the JSON strings, classes and how to make them work with each other, in which I finally succeeded.
     I could work with the created dictionary, insert new users, which also created new decks inside them and so on, so it was really tightly combined with everything and I had to be careful to not forget any errors or bugs while working with my more-complex-than-it-needed-to-be-design.
+	A big problem was that my design with using JSON as a main way of getting/setting decks was very time-consuming to find the bugs, fix them and make it work. So I only had less time for the battle than I expected.
 
 - End of the Project:
 

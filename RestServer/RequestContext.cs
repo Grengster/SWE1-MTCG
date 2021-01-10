@@ -13,6 +13,7 @@ using DatabaseHandler;
 using System.Xml.XPath;
 using RestServer;
 using MockServer;
+using System.Collections.Specialized;
 
 namespace Request
 {
@@ -144,7 +145,7 @@ namespace Request
                                 SendStatus(stream, "DECK EMPTY", 403);
                         }
                         else if(result == -1)
-                            SendStatus(stream, "WRONG DECKCODE", 403);
+                            SendStatus(stream, "NO DECK AVAILABLE TO BUY, CONTACT ADMIN", 404);
                         else if (result == -2)
                             SendStatus(stream, "CARD ALREADY IN DECK", 403);
                         else if (result == -3)
@@ -170,14 +171,107 @@ namespace Request
             }
             if (RqstType == "GET")
             {
-                if (data.Contains("/cards HTTP/1.1"))
+                if (!MyTcpListener.loggedUsers.ContainsKey(user.username))
+                    SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                else if (data.Contains("/cards HTTP/1.1"))
                 {
-                    int result = database.RetrieveCards(MyTcpListener.loggedUsers[user.username]);
-                    if (result == 1)
-                        SendStatus(stream, "NO DECKS IN CARDS", 200);
-                    if (result == 2)
-                        SendStatus(stream, "Your deck: \n" + MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
-                }  
+                    if(data.Contains("Authorization: Basic "+ MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        string result = database.SeeBoughtCards(MyTcpListener.loggedUsers[user.username]);
+                        if (result == "zero")
+                            SendStatus(stream, "NO PACKAGES BOUGHT", 200);
+                        else
+                            SendStatus(stream, result, 200);
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                }
+                else if (data.Contains("/deck HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        int result = MyTcpListener.loggedUsers[user.username].userDeck.Count();
+                        if (result <= 0)
+                            SendStatus(stream, "NO CARDS IN DECK, SELECT UP TO FOUR WITH ID\n" + database.SeeBoughtCards(MyTcpListener.loggedUsers[user.username]), 200);
+                        else
+                            SendStatus(stream, MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                }
+                else if (data.Contains("users/"+ MyTcpListener.loggedUsers[user.username].username+" HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        database.CheckUserInfo(MyTcpListener.loggedUsers[user.username], "get", "");
+                        SendStatus(stream, MyTcpListener.loggedUsers[user.username].SeeUserInfo(MyTcpListener.loggedUsers[user.username]), 200);
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                }
+                else if (data.Contains("/stats HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        database.CheckStats(MyTcpListener.loggedUsers[user.username], "get", 0, 0, 0);
+                        SendStatus(stream, MyTcpListener.loggedUsers[user.username].SeeUserStats(MyTcpListener.loggedUsers[user.username]), 200);
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                }
+                else if (data.Contains("/score HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        SendStatus(stream, database.CheckScore(MyTcpListener.loggedUsers[user.username]), 200);
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                }
+
+                else if (data.Contains("/checkusers HTTP/1.1"))
+                    SendStatus(stream, ShowOnlineUsers(), 200);
+                else
+                    SendStatus(stream, "WRONG COMMAND", 403);
+            }
+            if (RqstType == "PUT")
+            {
+                if(data.Contains("/deck HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        int pFrom = data.IndexOf("[") + "[".Length;
+                        int pTo = data.LastIndexOf("]");
+
+                        String result = data[pFrom..pTo];
+                        result = "[" + result + "]";
+                        database.InsertCards(MyTcpListener.loggedUsers[user.username], result);
+                        SendStatus(stream, MyTcpListener.loggedUsers[user.username].SeeDeck(MyTcpListener.loggedUsers[user.username]), 200);
+                    }
+                    else
+                        SendStatus(stream, "AUTHENTICATION ERROR", 403);
+                }
+                else if (data.Contains("users/" + MyTcpListener.loggedUsers[user.username].username + " HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        if (data.Contains("Content-Type: application/json"))
+                        {
+                            int pFrom = data.IndexOf("{") + "{".Length;
+                            int pTo = data.LastIndexOf("}");
+
+                            String result = data[pFrom..pTo];
+                            result = "{" + result + "}";
+                            int resultFunc = database.CheckUserInfo(MyTcpListener.loggedUsers[user.username], "set", result);
+                            if (resultFunc == 1)
+                                SendStatus(stream, "SET INFO:\n" + MyTcpListener.loggedUsers[user.username].SeeUserInfo(MyTcpListener.loggedUsers[user.username]), 200);
+                            else if (resultFunc == -1)
+                                SendStatus(stream, "ERROR" , 403);
+                        }
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
+                }
                 else
                     SendStatus(stream, "WRONG COMMAND", 403);
             }
@@ -194,6 +288,7 @@ namespace Request
             if (data.Contains("QUIT") || data.Contains("quit") && MyTcpListener.loggedUsers.ContainsKey(user.username))
             {
                 MyTcpListener.loggedUsers.Remove(user.username);
+                MyTcpListener.onlineUsers.Remove(user.username);
                 SendStatus(stream, "Successfully logged out", 499);
                 userConnected = false;
                 return;
@@ -210,14 +305,18 @@ namespace Request
             if (data.Contains("DELETE"))
                 CheckMessage(stream, data, "DELETE",ref user);
             
-                    
-            //string response = "Hallo";
-            //string serverResponse = "HTTP/1.1 200 OK \nServer: myserver \nContent - Length:" + response.Length + " \nContent - Language: de \nConnection: close \nContent - Type: text / plain\n\n" + response;
-            //Console.WriteLine(serverResponse);
-            //byte[] sendBytes = Encoding.ASCII.GetBytes(serverResponse);
-            //stream.Write(sendBytes, 0, sendBytes.Length);
-            //stream.Flush();
 
+        }
+
+
+        public string ShowOnlineUsers()
+        {
+            string userList = "Current online users:\n";
+            foreach(string tempUsers in MyTcpListener.onlineUsers)
+            {
+                userList += "- " + tempUsers + "\n";
+            }
+            return userList;
         }
 
 

@@ -6,7 +6,10 @@ namespace RestServer
 {
     public class SessUser
     {
-        public string username="", password="";
+        public string username="", password="", name="", bio="", image="";
+        public int wins = 0, losses = 0, points = 0;
+        public bool readyToFight = false;
+        public bool online = false;
         private DateTime lastlogin;
         public List<deckData> userDeck = new List<deckData>();
         public SessUser()
@@ -17,6 +20,7 @@ namespace RestServer
         {
             username = name;
             password = pwd;
+            online = true;
         }
 
         public string GetInfo()
@@ -37,6 +41,20 @@ namespace RestServer
                 return output;
             else
                 return null;
+        }
+        public string SeeUserInfo(SessUser user)
+        {
+            if (user.name == "")
+                user.name = "NOT SET";
+            if (user.bio == "")
+                user.bio = "NOT SET";
+            if (user.image == "")
+                user.image = "NOT SET";
+            return "Userinfo:\n" + "Name: " + user.name + "\n" + "Bio: " + user.bio + "\n" + "Image: " + user.image + "\n";
+        }
+        public string SeeUserStats(SessUser user)
+        {
+            return "Userstats:\n" + "Points: " + user.points + "\n" + "Wins: " + user.wins + "\n" + "Losses: " + user.losses + "\n";
         }
 
         public string GetUser()

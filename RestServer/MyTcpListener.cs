@@ -27,6 +27,7 @@ namespace MockServer
         }
 
         public static Dictionary<string, SessUser> loggedUsers = new Dictionary<string, SessUser>();
+        public static List <string> onlineUsers = new List<string>();
 
         public static void Main()
         {
