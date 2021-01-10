@@ -7,12 +7,16 @@
 
   <ItemGroup>
     <Compile Remove="DotnetLightsaberFight-main\**" />
+    <Compile Remove="Unit-Testing\**" />
     <EmbeddedResource Remove="DotnetLightsaberFight-main\**" />
+    <EmbeddedResource Remove="Unit-Testing\**" />
     <None Remove="DotnetLightsaberFight-main\**" />
+    <None Remove="Unit-Testing\**" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="Class1.cs" />
+    <PackageReference Include="Npgsql" Version="5.0.0" />
   </ItemGroup>
 
 </Project>
