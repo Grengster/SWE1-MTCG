@@ -14,12 +14,14 @@ using System.Xml.XPath;
 using RestServer;
 using MockServer;
 using System.Collections.Specialized;
+using BattleHandler;
 
 namespace Request
 {
     public class RequestContext
     {
         readonly DatabaseHandlerClass database = new DatabaseHandlerClass();
+        readonly BattleHandlerClass battlehandler = new BattleHandlerClass();
         public RequestContext(){ database.DBConnect(); }
 
         public string currUser = "";
@@ -165,6 +167,51 @@ namespace Request
                         SendStatus(stream, "INSERT SUCCESS", 200);
                     else
                         SendStatus(stream, "ERROR EXECUTING COMMAND", 403);
+                }
+                else if (data.Contains("/battles HTTP/1.1"))
+                {
+                    if (data.Contains("Authorization: Basic " + MyTcpListener.loggedUsers[user.username].username + "-mtcgToken"))
+                    {
+                        bool battleOver = false;
+                        MyTcpListener.loggedUsers[user.username].readyToFight = true;
+                        if(!MyTcpListener.fightQueue.Contains(user))
+                            MyTcpListener.fightQueue.Add(user);
+                        while(!battleOver)
+                        {
+                            if (MyTcpListener.fightQueue.Count() > 1)
+                            {
+                                for (int i = 0; i < MyTcpListener.fightQueue.Count(); i++)
+                                {
+                                    if (MyTcpListener.fightQueue[i].username != user.username)
+                                    {
+                                        string battleLog = battlehandler.startBattle(MyTcpListener.loggedUsers[MyTcpListener.fightQueue[i].username], MyTcpListener.loggedUsers[user.username]);
+                                        if (battleLog == "Player1Err")
+                                        {
+                                            SendStatus(stream, "PLAYER 1 DOESNT HAVE A VALID DECK", 403);
+                                            battleOver = true;
+                                        }
+                                        else if (battleLog == "Player2Err")
+                                        {
+                                            SendStatus(stream, "PLAYER 2 DOESNT HAVE A VALID DECK", 403);
+                                            battleOver = true;
+                                        }
+                                        else
+                                        {
+                                            SendStatus(stream, battleLog, 200);
+                                            MyTcpListener.fightQueue.RemoveAt(i);
+                                            MyTcpListener.fightQueue.Remove(user);
+                                            battleOver = true;
+                                        }
+                                            
+                                    }
+
+                                }
+                            }
+                            Console.WriteLine("Waiting for second player...");
+                        }
+                    }
+                    else
+                        SendStatus(stream, "WRONG AUTHENTICATION", 403);
                 }
                 else
                     SendStatus(stream, "WRONG COMMAND", 403);
